@@ -1,11 +1,12 @@
 package com.sena.tienda.service;
 
+import com.sena.tienda.exception.RecursoNoEncontradoException;
+import com.sena.tienda.exception.StockInsuficienteException;
 import com.sena.tienda.model.*;
 import com.sena.tienda.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.BigDecimal;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -13,83 +14,54 @@ import java.util.Optional;
 /**
  * SERVICIO: VentaService
  * Lógica de negocio para el registro de ventas.
- *
- * Validaciones (con if):
- *   1. Que el cliente exista por su cliente_id (Long)
- *   2. Que la bicicleta exista por su codigo
- *   3. Que el stock en Inventario sea suficiente
- *
- * Cálculos:
- *   subtotal = precio × cantidad  (en DetalleVenta)
- *   total    = suma de subtotales  (en Venta)
- *   Descuenta automáticamente del stock en Inventario
  */
 @Service
 public class VentaService {
 
-    @Autowired
-    private VentaRepository ventaRepository;
+    // 1. DEPENDENCIAS INMUTABLES (DIP: Inyección por constructor)
+    private final VentaRepository ventaRepository;
+    private final InventarioRepository inventarioRepository;
 
-    @Autowired
-    private ClienteRepository clienteRepository;
-
-    @Autowired
-    private BicicletaRepository bicicletaRepository;
-
-    @Autowired
-    private InventarioRepository inventarioRepository;
+    public VentaService(VentaRepository ventaRepository, InventarioRepository inventarioRepository) {
+        this.ventaRepository = ventaRepository;
+        this.inventarioRepository = inventarioRepository;
+    }
 
     // ===================================================================
     // REGISTRAR VENTA
     // ===================================================================
 
     /**
-     * Registra una venta completa.
+     * Registra una venta completa utilizando los objetos de dominio.
      *
-     * @param clienteId       cliente_id del cliente (Long, PK de la tabla Clientes)
-     * @param codigoBicicleta código único de la bicicleta
-     * @param cantidad        unidades a comprar
-     * @return la Venta persistida con su id_venta generado
+     * @param cliente   Objeto Cliente (Usuario) que realiza la compra
+     * @param bicicleta Objeto Bicicleta que se va a vender
+     * @param cantidad  Unidades a comprar
+     * @return la Venta persistida
      */
     @Transactional
-    public Venta registrarVenta(Long clienteId, String codigoBicicleta, int cantidad) {
+    public Venta registrarVenta(Cliente cliente, Bicicleta bicicleta, int cantidad) {
 
-        // ---- VALIDACIÓN 1: Existencia del Cliente (por cliente_id) ----
-        Optional<Cliente> clienteOpt = clienteRepository.findById(clienteId);
-
-        if (!clienteOpt.isPresent()) {
-            throw new RuntimeException(
-                    "ERROR: No existe un cliente con cliente_id = " + clienteId);
+        // ---- VALIDACIÓN 1: Integridad de los objetos ----
+        if (cliente == null || cliente.getClienteId() == null) {
+            throw new RecursoNoEncontradoException("El objeto Cliente proporcionado no es válido.");
         }
-        Cliente cliente = clienteOpt.get();
-
-        // ---- VALIDACIÓN 2: Existencia de la Bicicleta (por codigo) ----
-        Optional<Bicicleta> bicicletaOpt = bicicletaRepository.findByCodigo(codigoBicicleta);
-
-        if (!bicicletaOpt.isPresent()) {
-            throw new RuntimeException(
-                    "ERROR: No existe bicicleta con código '" + codigoBicicleta + "'.");
+        if (bicicleta == null || bicicleta.getIdBicicleta() == null) {
+            throw new RecursoNoEncontradoException("El objeto Bicicleta proporcionado no es válido.");
         }
-        Bicicleta bicicleta = bicicletaOpt.get();
-
-        // ---- VALIDACIÓN 3: Stock en Inventario ----
-        Optional<Inventario> inventarioOpt =
-                inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta());
-
-        if (!inventarioOpt.isPresent()) {
-            throw new RuntimeException(
-                    "ERROR: No hay registro de inventario para la bicicleta '" + codigoBicicleta + "'.");
-        }
-        Inventario inventario = inventarioOpt.get();
-
         if (cantidad <= 0) {
-            throw new RuntimeException("ERROR: La cantidad debe ser mayor a cero.");
+            throw new IllegalArgumentException("La cantidad de venta debe ser mayor a cero.");
         }
+
+        // ---- VALIDACIÓN 2: Stock en Inventario (Uso de excepciones propias) ----
+        Inventario inventario = inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No hay registro de inventario para la bicicleta '" + bicicleta.getCodigo() + "'."));
 
         if (inventario.getCantidadDisponible() < cantidad) {
-            throw new RuntimeException(
-                    "ERROR: Stock insuficiente. Disponible: " +
-                            inventario.getCantidadDisponible() + " | Solicitado: " + cantidad);
+            throw new StockInsuficienteException(
+                    "Stock insuficiente. Disponible: " + inventario.getCantidadDisponible() +
+                            " | Solicitado: " + cantidad);
         }
 
         // ---- CREACIÓN DE LA VENTA (cabecera) ----
@@ -97,7 +69,6 @@ public class VentaService {
         venta.setFecha(LocalDateTime.now());
 
         // ---- CREACIÓN DEL DETALLE ----
-        // subtotal = precio × cantidad  (calculado en el constructor)
         DetalleVenta detalle = new DetalleVenta(venta, bicicleta, cantidad);
         venta.getDetalles().add(detalle);
 
@@ -108,7 +79,7 @@ public class VentaService {
         inventario.setCantidadDisponible(inventario.getCantidadDisponible() - cantidad);
         inventarioRepository.save(inventario);
 
-        // ---- PERSISTENCIA (cascade guarda también los DetalleVenta) ----
+        // ---- PERSISTENCIA ----
         Venta ventaGuardada = ventaRepository.save(venta);
 
         System.out.println("✅ Venta registrada. id_venta=" + ventaGuardada.getIdVenta()
