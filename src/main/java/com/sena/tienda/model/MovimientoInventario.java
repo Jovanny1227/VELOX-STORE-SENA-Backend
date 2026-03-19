@@ -1,5 +1,6 @@
 package com.sena.tienda.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,10 +16,12 @@ public class MovimientoInventario {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_bicicleta", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Bicicleta bicicleta;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_proveedor", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Proveedor proveedor;
 
     @Enumerated(EnumType.STRING)
@@ -40,8 +43,8 @@ public class MovimientoInventario {
     public MovimientoInventario() {}
 
     public MovimientoInventario(Bicicleta bicicleta, Proveedor proveedor,
-                                 TipoMovimiento tipo, Integer cantidad,
-                                 BigDecimal precioUnitario, String observacion) {
+                                TipoMovimiento tipo, Integer cantidad,
+                                BigDecimal precioUnitario, String observacion) {
         this.bicicleta = bicicleta;
         this.proveedor = proveedor;
         this.tipo = tipo;
@@ -52,34 +55,19 @@ public class MovimientoInventario {
     }
 
     public Long getIdMovimiento() { return idMovimiento; }
-    public void setIdMovimiento(Long idMovimiento) { this.idMovimiento = idMovimiento; }
-
+    public void setIdMovimiento(Long v) { this.idMovimiento = v; }
     public Bicicleta getBicicleta() { return bicicleta; }
-    public void setBicicleta(Bicicleta bicicleta) { this.bicicleta = bicicleta; }
-
+    public void setBicicleta(Bicicleta v) { this.bicicleta = v; }
     public Proveedor getProveedor() { return proveedor; }
-    public void setProveedor(Proveedor proveedor) { this.proveedor = proveedor; }
-
+    public void setProveedor(Proveedor v) { this.proveedor = v; }
     public TipoMovimiento getTipo() { return tipo; }
-    public void setTipo(TipoMovimiento tipo) { this.tipo = tipo; }
-
+    public void setTipo(TipoMovimiento v) { this.tipo = v; }
     public Integer getCantidad() { return cantidad; }
-    public void setCantidad(Integer cantidad) { this.cantidad = cantidad; }
-
+    public void setCantidad(Integer v) { this.cantidad = v; }
     public BigDecimal getPrecioUnitario() { return precioUnitario; }
-    public void setPrecioUnitario(BigDecimal precioUnitario) { this.precioUnitario = precioUnitario; }
-
+    public void setPrecioUnitario(BigDecimal v) { this.precioUnitario = v; }
     public LocalDateTime getFecha() { return fecha; }
-    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
-
+    public void setFecha(LocalDateTime v) { this.fecha = v; }
     public String getObservacion() { return observacion; }
-    public void setObservacion(String observacion) { this.observacion = observacion; }
-
-    @Override
-    public String toString() {
-        return "MovimientoInventario{idMovimiento=" + idMovimiento +
-                ", tipo=" + tipo +
-                ", cantidad=" + cantidad +
-                ", fecha=" + fecha + "}";
-    }
+    public void setObservacion(String v) { this.observacion = v; }
 }
