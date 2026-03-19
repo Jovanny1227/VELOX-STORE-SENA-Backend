@@ -1,6 +1,6 @@
 package com.sena.tienda.service;
 
-import com.sena.tienda.dto.InventarioDTO;
+import com.sena.tienda.dto.response.InventarioDTO;
 import com.sena.tienda.repository.InventarioRepository;
 import org.springframework.stereotype.Service;
 import java.util.Map;
@@ -16,25 +16,16 @@ public class InventarioService {
         this.inventarioRepository = inventarioRepository;
     }
 
-    public List<InventarioDTO> obtenerInventario(){
+    public List<InventarioDTO> obtenerInventario() {
         return inventarioRepository.obtenerInventarioCompleto();
     }
 
-    public Map<String, Integer> dashboardInventario(){
-
+    public Map<String, Integer> dashboardInventario() {
         Map<String, Integer> dashboard = new HashMap<>();
+        dashboard.put("stockTotal", inventarioRepository.stockTotal());
 
-        int total = inventarioRepository.stockTotal();
-        dashboard.put("stockTotal", total);
-
-        List<Object[]> porTipo = inventarioRepository.stockPorTipo();
-
-        for(Object[] r : porTipo){
-
-            String tipo = r[0].toString();
-            Integer cantidad = ((Number) r[1]).intValue();
-
-            dashboard.put(tipo, cantidad);
+        for (Object[] r : inventarioRepository.stockPorTipo()) {
+            dashboard.put(r[0].toString(), ((Number) r[1]).intValue());
         }
 
         return dashboard;
