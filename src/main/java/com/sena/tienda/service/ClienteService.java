@@ -7,44 +7,47 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * SERVICIO: ClienteService
- * La PK ahora es Long (cliente_id autoincremental).
- * El documento sigue siendo único pero ya no es la PK.
- */
 @Service
 public class ClienteService {
 
     @Autowired
     private ClienteRepository clienteRepository;
 
-    /**
-     * Registra un nuevo cliente.
-     * Valida que el documento (cédula/NIT) no esté duplicado.
-     */
     public Cliente registrarCliente(Cliente cliente) {
-
         if (clienteRepository.existsByDocumento(cliente.getDocumento())) {
-            throw new RuntimeException(
-                    "ERROR: Ya existe un cliente con el documento '" + cliente.getDocumento() + "'.");
+            throw new RuntimeException("Ya existe un cliente con el documento: " + cliente.getDocumento());
         }
+        return clienteRepository.save(cliente);
+    }
 
-        Cliente guardado = clienteRepository.save(cliente);
-        System.out.println("✅ Cliente registrado: " + guardado.getNombre()
-                + " (cliente_id=" + guardado.getClienteId() + ")");
-        return guardado;
+    public Cliente actualizarCliente(Long id, Cliente datos) {
+        Cliente existente = clienteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + id));
+        existente.setNombre(datos.getNombre());
+        existente.setTelefono(datos.getTelefono());
+        if (!existente.getDocumento().equals(datos.getDocumento()) &&
+            clienteRepository.existsByDocumento(datos.getDocumento())) {
+            throw new RuntimeException("Ya existe un cliente con el documento: " + datos.getDocumento());
+        }
+        existente.setDocumento(datos.getDocumento());
+        return clienteRepository.save(existente);
+    }
+
+    public void eliminarCliente(Long id) {
+        if (!clienteRepository.existsById(id)) {
+            throw new RuntimeException("Cliente no encontrado: " + id);
+        }
+        clienteRepository.deleteById(id);
     }
 
     public List<Cliente> listarClientes() {
         return clienteRepository.findAll();
     }
 
-    /** Busca por PK (cliente_id) */
     public Optional<Cliente> buscarPorId(Long clienteId) {
         return clienteRepository.findById(clienteId);
     }
 
-    /** Busca por documento (cédula/NIT) */
     public Optional<Cliente> buscarPorDocumento(String documento) {
         return clienteRepository.findByDocumento(documento);
     }

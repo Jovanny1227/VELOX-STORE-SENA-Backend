@@ -5,6 +5,7 @@ import com.sena.tienda.model.Venta;
 import com.sena.tienda.service.VentaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,12 +19,15 @@ public class VentaController {
     private VentaService ventaService;
 
     @PostMapping("/registrar")
-    public Venta registrarVenta(@RequestBody VentaRequest request) {
-        return ventaService.registrarVenta(
-                request.getClienteId(),
-                request.getCodigoBicicleta(),
-                request.getCantidad()
-        );
+    public ResponseEntity<?> registrarVenta(@RequestBody VentaRequest request) {
+        try {
+            return ResponseEntity.ok(ventaService.registrarVenta(
+                    request.getClienteId(),
+                    request.getCodigoBicicleta(),
+                    request.getCantidad()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping
@@ -37,8 +41,19 @@ public class VentaController {
     }
 
     @GetMapping("/{idVenta}")
-    public Venta buscarVenta(@PathVariable Long idVenta) {
+    public ResponseEntity<?> buscarVenta(@PathVariable Long idVenta) {
         return ventaService.buscarVentaPorId(idVenta)
-                .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{idVenta}")
+    public ResponseEntity<?> eliminarVenta(@PathVariable Long idVenta) {
+        try {
+            ventaService.eliminarVenta(idVenta);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

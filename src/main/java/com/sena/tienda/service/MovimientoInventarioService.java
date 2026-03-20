@@ -28,47 +28,34 @@ public class MovimientoInventarioService {
 
     @Transactional
     public MovimientoInventario registrar(MovimientoRequest request) {
-
-        if (request.getCantidad() == null || request.getCantidad() <= 0) {
+        if (request.getCantidad() == null || request.getCantidad() <= 0)
             throw new RuntimeException("La cantidad debe ser mayor a cero");
-        }
-
         Bicicleta bicicleta = bicicletaRepository.findByCodigo(request.getCodigoBicicleta())
                 .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + request.getCodigoBicicleta()));
-
         Inventario inventario = inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
-                .orElseThrow(() -> new RuntimeException("Inventario no encontrado para: " + request.getCodigoBicicleta()));
-
+                .orElseGet(() -> new Inventario(bicicleta, 0));
         Proveedor proveedor = null;
         if (request.getTipo() == TipoMovimiento.ENTRADA) {
-            if (request.getIdProveedor() == null) {
+            if (request.getIdProveedor() == null)
                 throw new RuntimeException("Para una ENTRADA se requiere el proveedor");
-            }
             proveedor = proveedorRepository.findById(request.getIdProveedor())
                     .orElseThrow(() -> new RuntimeException("Proveedor no encontrado: " + request.getIdProveedor()));
         }
-
         int stockActual = inventario.getCantidadDisponible();
-
         switch (request.getTipo()) {
             case ENTRADA, AJUSTE_POSITIVO, DEVOLUCION ->
                 inventario.setCantidadDisponible(stockActual + request.getCantidad());
             case SALIDA_VENTA, AJUSTE_NEGATIVO -> {
-                if (stockActual < request.getCantidad()) {
+                if (stockActual < request.getCantidad())
                     throw new RuntimeException("Stock insuficiente. Disponible: " + stockActual);
-                }
                 inventario.setCantidadDisponible(stockActual - request.getCantidad());
             }
         }
-
         inventarioRepository.save(inventario);
-
         MovimientoInventario movimiento = new MovimientoInventario(
                 bicicleta, proveedor, request.getTipo(),
                 request.getCantidad(), request.getPrecioUnitario(),
-                request.getObservacion()
-        );
-
+                request.getObservacion());
         return movimientoRepository.save(movimiento);
     }
 
