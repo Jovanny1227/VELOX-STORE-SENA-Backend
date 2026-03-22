@@ -2,6 +2,8 @@ package com.sena.tienda.controller;
 
 import com.sena.tienda.dto.request.VentaRequest;
 import com.sena.tienda.model.Venta;
+import com.sena.tienda.service.BicicletaService;
+import com.sena.tienda.service.ClienteService;
 import com.sena.tienda.service.VentaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +17,16 @@ import java.util.List;
 @CrossOrigin(origins = "*")
 public class VentaController {
 
-    @Autowired
-    private VentaService ventaService;
+    // Inyección de dependencias por constructor (Cumpliendo DIP)
+    private final VentaService ventaService;
+    private final ClienteService clienteService;
+    private final BicicletaService bicicletaService;
+
+    public VentaController(VentaService ventaService, ClienteService clienteService, BicicletaService bicicletaService) {
+        this.ventaService = ventaService;
+        this.clienteService = clienteService;
+        this.bicicletaService = bicicletaService;
+    }
 
     @PostMapping("/registrar")
     public ResponseEntity<?> registrarVenta(@RequestBody VentaRequest request) {
@@ -31,13 +41,13 @@ public class VentaController {
     }
 
     @GetMapping
-    public List<Venta> listarVentas() {
-        return ventaService.listarTodasLasVentas();
+    public ResponseEntity<List<Venta>> listarVentas() {
+        return ResponseEntity.ok(ventaService.listarTodasLasVentas());
     }
 
     @GetMapping("/cliente/{clienteId}")
-    public List<Venta> ventasPorCliente(@PathVariable Long clienteId) {
-        return ventaService.buscarVentasPorCliente(clienteId);
+    public ResponseEntity<List<Venta>> ventasPorCliente(@PathVariable Long clienteId) {
+        return ResponseEntity.ok(ventaService.buscarVentasPorCliente(clienteId));
     }
 
     @GetMapping("/{idVenta}")
