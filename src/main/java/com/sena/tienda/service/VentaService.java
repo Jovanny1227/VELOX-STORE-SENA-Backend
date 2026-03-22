@@ -1,5 +1,7 @@
 package com.sena.tienda.service;
 
+import com.sena.tienda.exception.RecursoNoEncontradoException;
+import com.sena.tienda.exception.StockInsuficienteException;
 import com.sena.tienda.model.*;
 import com.sena.tienda.repository.*;
 import com.sena.tienda.dto.request.MovimientoRequest;
