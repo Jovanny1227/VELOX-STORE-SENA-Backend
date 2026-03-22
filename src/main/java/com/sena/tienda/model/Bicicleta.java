@@ -34,15 +34,22 @@ public class Bicicleta {
     @Column(name = "tipo", nullable = false)
     private TipoBicicleta tipo;
 
+    // --- NUEVA RELACIÓN CON PROVEEDOR ---
+    @ManyToOne
+    @JoinColumn(name = "id_proveedor")
+    private Proveedor proveedor;
+
     public Bicicleta() {}
 
-    public Bicicleta(String modelo, String marca, BigDecimal precio, TipoBicicleta tipo) {
+    public Bicicleta(String modelo, String marca, BigDecimal precio, TipoBicicleta tipo, Proveedor proveedor) {
         this.modelo = modelo;
         this.marca = marca;
         this.precio = precio;
         this.tipo = tipo;
+        this.proveedor = proveedor;
     }
 
+    // Getters y Setters
     public Long getIdBicicleta() { return idBicicleta; }
     public void setIdBicicleta(Long idBicicleta) { this.idBicicleta = idBicicleta; }
 
@@ -61,15 +68,6 @@ public class Bicicleta {
     public TipoBicicleta getTipo() { return tipo; }
     public void setTipo(TipoBicicleta tipo) { this.tipo = tipo; }
 
-    @Override
-    public String toString() {
-        return "Bicicleta{" +
-                "id=" + idBicicleta +
-                ", codigo='" + codigo + '\'' +
-                ", marca='" + marca + '\'' +
-                ", modelo='" + modelo + '\'' +
-                ", tipo=" + tipo +
-                ", precio=" + precio +
-                '}';
-    }
+    public Proveedor getProveedor() { return proveedor; }
+    public void setProveedor(Proveedor proveedor) { this.proveedor = proveedor; }
 }
