@@ -21,80 +21,60 @@ public class BicicletaService {
         this.inventarioRepository = inventarioRepository;
     }
 
-    // Genera código tipo BIC-001
-    private String generarCodigo(Long id){
+    private String generarCodigo(Long id) {
         return String.format("BIC-%03d", id);
     }
 
     @Transactional
-    public Bicicleta registrarBicicleta(Bicicleta bicicleta, int stockInicial){
-
-        if(stockInicial < 0){
-            throw new RuntimeException("El stock inicial no puede ser negativo");
-        }
-
-        // Guardamos primero para obtener ID
+    public Bicicleta registrarBicicleta(Bicicleta bicicleta, int stockInicial) {
+        if (stockInicial < 0) throw new RuntimeException("El stock no puede ser negativo");
         Bicicleta guardada = bicicletaRepository.save(bicicleta);
-
-        // Generamos código automático
-        String codigo = generarCodigo(guardada.getIdBicicleta());
-        guardada.setCodigo(codigo);
-
-        // Guardamos código
+        guardada.setCodigo(generarCodigo(guardada.getIdBicicleta()));
         bicicletaRepository.save(guardada);
-
-        // Creamos inventario
         Inventario inventario = new Inventario();
         inventario.setBicicleta(guardada);
         inventario.setCantidadDisponible(stockInicial);
-
         inventarioRepository.save(inventario);
-
         return guardada;
     }
 
-    public List<Bicicleta> listarBicicletas(){
+    @Transactional
+    public void eliminarBicicleta(Long id) {
+        Bicicleta bicicleta = bicicletaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + id));
+        inventarioRepository.findByBicicletaIdBicicleta(id).ifPresent(inventarioRepository::delete);
+        bicicletaRepository.delete(bicicleta);
+    }
+
+    public List<Bicicleta> listarBicicletas() {
         return bicicletaRepository.findAll();
     }
 
-    public Optional<Bicicleta> buscarPorCodigo(String codigo){
+    public Optional<Bicicleta> buscarPorCodigo(String codigo) {
         return bicicletaRepository.findByCodigo(codigo);
     }
 
-    public List<Bicicleta> buscar(String texto){
+    public List<Bicicleta> buscar(String texto) {
         return bicicletaRepository.buscar(texto);
     }
 
-    public int consultarStock(String codigoBicicleta){
-
+    public int consultarStock(String codigoBicicleta) {
         Bicicleta b = bicicletaRepository.findByCodigo(codigoBicicleta)
                 .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada"));
-
-        return inventarioRepository
-                .findByBicicletaIdBicicleta(b.getIdBicicleta())
-                .map(Inventario::getCantidadDisponible)
-                .orElse(0);
+        return inventarioRepository.findByBicicletaIdBicicleta(b.getIdBicicleta())
+                .map(Inventario::getCantidadDisponible).orElse(0);
     }
 
-    public int stockTotal(){
+    public int stockTotal() {
         Integer total = inventarioRepository.stockTotal();
         return total != null ? total : 0;
     }
 
-    public Map<String,Integer> stockPorTipo(){
-
-        List<Object[]> resultados = inventarioRepository.stockPorTipo();
-
-        Map<String,Integer> mapa = new HashMap<>();
-
-        for(Object[] r : resultados){
-
-            String tipo = r[0].toString();
-            Integer cantidad = ((Number) r[1]).intValue();
-
-            mapa.put(tipo, cantidad);
+    public Map<String, Integer> stockPorTipo() {
+        Map<String, Integer> mapa = new HashMap<>();
+        for (Object[] r : inventarioRepository.stockPorTipo()) {
+            mapa.put(r[0].toString(), ((Number) r[1]).intValue());
         }
-
         return mapa;
     }
 }

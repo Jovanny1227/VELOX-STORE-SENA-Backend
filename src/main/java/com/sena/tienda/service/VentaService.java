@@ -11,86 +11,50 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * SERVICIO: VentaService
- * Lógica de negocio para el registro de ventas.
- */
 @Service
 public class VentaService {
 
-    // 1. DEPENDENCIAS INMUTABLES (DIP: Inyección por constructor)
-    private final VentaRepository ventaRepository;
-    private final InventarioRepository inventarioRepository;
+    @Autowired private VentaRepository ventaRepository;
+    @Autowired private ClienteRepository clienteRepository;
+    @Autowired private BicicletaRepository bicicletaRepository;
+    @Autowired private InventarioRepository inventarioRepository;
 
-    public VentaService(VentaRepository ventaRepository, InventarioRepository inventarioRepository) {
-        this.ventaRepository = ventaRepository;
-        this.inventarioRepository = inventarioRepository;
-    }
-
-    // ===================================================================
-    // REGISTRAR VENTA
-    // ===================================================================
-
-    /**
-     * Registra una venta completa utilizando los objetos de dominio.
-     *
-     * @param cliente   Objeto Cliente (Usuario) que realiza la compra
-     * @param bicicleta Objeto Bicicleta que se va a vender
-     * @param cantidad  Unidades a comprar
-     * @return la Venta persistida
-     */
     @Transactional
-    public Venta registrarVenta(Cliente cliente, Bicicleta bicicleta, int cantidad) {
-
-        // ---- VALIDACIÓN 1: Integridad de los objetos ----
-        if (cliente == null || cliente.getClienteId() == null) {
-            throw new RecursoNoEncontradoException("El objeto Cliente proporcionado no es válido.");
-        }
-        if (bicicleta == null || bicicleta.getIdBicicleta() == null) {
-            throw new RecursoNoEncontradoException("El objeto Bicicleta proporcionado no es válido.");
-        }
-        if (cantidad <= 0) {
-            throw new IllegalArgumentException("La cantidad de venta debe ser mayor a cero.");
-        }
-
-        // ---- VALIDACIÓN 2: Stock en Inventario (Uso de excepciones propias) ----
+    public Venta registrarVenta(Long clienteId, String codigoBicicleta, int cantidad) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + clienteId));
+        Bicicleta bicicleta = bicicletaRepository.findByCodigo(codigoBicicleta)
+                .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + codigoBicicleta));
         Inventario inventario = inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
-                .orElseThrow(() -> new RecursoNoEncontradoException(
-                        "No hay registro de inventario para la bicicleta '" + bicicleta.getCodigo() + "'."));
-
-        if (inventario.getCantidadDisponible() < cantidad) {
-            throw new StockInsuficienteException(
-                    "Stock insuficiente. Disponible: " + inventario.getCantidadDisponible() +
-                            " | Solicitado: " + cantidad);
-        }
-
-        // ---- CREACIÓN DE LA VENTA (cabecera) ----
+                .orElseThrow(() -> new RuntimeException("Inventario no encontrado para: " + codigoBicicleta));
+        if (cantidad <= 0) throw new RuntimeException("La cantidad debe ser mayor a cero");
+        if (inventario.getCantidadDisponible() < cantidad)
+            throw new RuntimeException("Stock insuficiente. Disponible: " + inventario.getCantidadDisponible());
         Venta venta = new Venta(cliente);
         venta.setFecha(LocalDateTime.now());
-
-        // ---- CREACIÓN DEL DETALLE ----
         DetalleVenta detalle = new DetalleVenta(venta, bicicleta, cantidad);
         venta.getDetalles().add(detalle);
-
-        // ---- CÁLCULO DEL TOTAL ----
         venta.setTotal(detalle.getSubtotal());
-
-        // ---- DESCUENTO AUTOMÁTICO DE STOCK ----
         inventario.setCantidadDisponible(inventario.getCantidadDisponible() - cantidad);
         inventarioRepository.save(inventario);
-
-        // ---- PERSISTENCIA ----
-        Venta ventaGuardada = ventaRepository.save(venta);
-
-        System.out.println("✅ Venta registrada. id_venta=" + ventaGuardada.getIdVenta()
-                + " | Total=$" + ventaGuardada.getTotal());
-
-        return ventaGuardada;
+        return ventaRepository.save(venta);
     }
 
-    // ===================================================================
-    // CONSULTAS
-    // ===================================================================
+    @Transactional
+    public void eliminarVenta(Long idVenta) {
+        Venta venta = ventaRepository.findById(idVenta)
+                .orElseThrow(() -> new RuntimeException("Venta no encontrada: " + idVenta));
+        for (DetalleVenta detalle : venta.getDetalles()) {
+            Inventario inventario = inventarioRepository
+                    .findByBicicletaIdBicicleta(detalle.getBicicleta().getIdBicicleta())
+                    .orElse(null);
+            if (inventario != null) {
+                inventario.setCantidadDisponible(inventario.getCantidadDisponible() + detalle.getCantidad());
+                inventarioRepository.save(inventario);
+            }
+        }
+        ventaRepository.delete(venta);
+    }
 
     public List<Venta> listarTodasLasVentas() {
         return ventaRepository.findAll();
