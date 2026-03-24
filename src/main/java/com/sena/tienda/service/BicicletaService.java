@@ -4,10 +4,12 @@ import com.sena.tienda.dto.request.BicicletaRequest;
 import com.sena.tienda.model.Bicicleta;
 import com.sena.tienda.model.Inventario;
 import com.sena.tienda.model.Proveedor;
+import com.sena.tienda.model.DetalleVenta; // <- Importa esto
 import com.sena.tienda.repository.BicicletaRepository;
 import com.sena.tienda.repository.InventarioRepository;
 import com.sena.tienda.repository.MovimientoInventarioRepository;
 import com.sena.tienda.repository.ProveedorRepository;
+import com.sena.tienda.repository.DetalleVentaRepository; // <- Importa esto
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +23,18 @@ public class BicicletaService {
     private final InventarioRepository inventarioRepository;
     private final MovimientoInventarioRepository movimientoRepository;
     private final ProveedorRepository proveedorRepository;
+    private final DetalleVentaRepository detalleVentaRepository;
 
     public BicicletaService(BicicletaRepository bicicletaRepository,
                             InventarioRepository inventarioRepository,
                             MovimientoInventarioRepository movimientoRepository,
-                            ProveedorRepository proveedorRepository) {
+                            ProveedorRepository proveedorRepository,
+                            DetalleVentaRepository detalleVentaRepository) {
         this.bicicletaRepository = bicicletaRepository;
         this.inventarioRepository = inventarioRepository;
         this.movimientoRepository = movimientoRepository;
         this.proveedorRepository = proveedorRepository;
+        this.detalleVentaRepository = detalleVentaRepository;
     }
 
     private String generarCodigo(Long id) {
@@ -63,6 +68,21 @@ public class BicicletaService {
         inventario.setCantidadDisponible(stockInicial);
         inventarioRepository.save(inventario);
 
+        // --- SOLUCIÓN: Agregar esto para registrar el historial del movimiento ---
+        if (stockInicial > 0) {
+            // Importa TipoMovimiento (import com.sena.tienda.model.TipoMovimiento;) y MovimientoInventario si no están
+            com.sena.tienda.model.MovimientoInventario movimiento = new com.sena.tienda.model.MovimientoInventario(
+                    guardada,
+                    proveedor,
+                    com.sena.tienda.model.TipoMovimiento.ENTRADA,
+                    stockInicial,
+                    request.precio(),
+                    "Inventario inicial al registrar la bicicleta"
+            );
+            movimientoRepository.save(movimiento);
+        }
+        // ------------------------------------------------------------------------
+
         return guardada;
     }
 
@@ -71,11 +91,22 @@ public class BicicletaService {
         Bicicleta bicicleta = bicicletaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada"));
 
-        if (!movimientoRepository.findByCodigoBicicleta(bicicleta.getCodigo()).isEmpty()) {
-            throw new RuntimeException("No se puede eliminar: La bicicleta tiene movimientos de inventario registrados.");
+        // 1. Borrar movimientos de inventario (El código que ya teníamos)
+        List<com.sena.tienda.model.MovimientoInventario> movimientos = movimientoRepository.findByCodigoBicicleta(bicicleta.getCodigo());
+        if (!movimientos.isEmpty()) {
+            movimientoRepository.deleteAll(movimientos);
         }
 
+        // 2. NUEVO PASO: Borrar Detalles de Venta asociados a la bicicleta
+        List<DetalleVenta> detalles = detalleVentaRepository.findByBicicleta(bicicleta);
+        if (!detalles.isEmpty()) {
+            detalleVentaRepository.deleteAll(detalles);
+        }
+
+        // 3. Borrar el inventario total
         inventarioRepository.findByBicicletaIdBicicleta(id).ifPresent(inventarioRepository::delete);
+
+        // 4. Finalmente, borrar la bicicleta
         bicicletaRepository.delete(bicicleta);
     }
 

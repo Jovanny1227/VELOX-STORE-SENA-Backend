@@ -55,7 +55,7 @@ public class ProveedorController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
         try {
-            proveedorService.eliminar(id);
+            proveedorService.eliminarProveedor(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());

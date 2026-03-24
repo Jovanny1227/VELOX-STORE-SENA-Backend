@@ -1,8 +1,11 @@
 package com.sena.tienda.service;
 
 import com.sena.tienda.model.Proveedor;
+import com.sena.tienda.model.Bicicleta; // <- Importar
 import com.sena.tienda.repository.ProveedorRepository;
+import com.sena.tienda.repository.BicicletaRepository; // <- Importar
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,9 +14,15 @@ import java.util.Optional;
 public class ProveedorService {
 
     private final ProveedorRepository proveedorRepository;
+    private final BicicletaRepository bicicletaRepository; // <- Agregar
+    private final BicicletaService bicicletaService;
 
-    public ProveedorService(ProveedorRepository proveedorRepository) {
+    public ProveedorService(ProveedorRepository proveedorRepository,
+                            BicicletaRepository bicicletaRepository,
+                            BicicletaService bicicletaService) {
         this.proveedorRepository = proveedorRepository;
+        this.bicicletaRepository = bicicletaRepository;
+        this.bicicletaService = bicicletaService;
     }
 
     public List<Proveedor> listar() {
@@ -41,10 +50,23 @@ public class ProveedorService {
         return proveedorRepository.save(existente);
     }
 
-    public void eliminar(Long id) {
-        if (!proveedorRepository.existsById(id)) {
-            throw new RuntimeException("Proveedor no encontrado con id: " + id);
+    @Transactional
+    public void eliminarProveedor(Long idProveedor) {
+        Proveedor proveedor = proveedorRepository.findById(idProveedor)
+                .orElseThrow(() -> new RuntimeException("Proveedor no encontrado: " + idProveedor));
+
+        // 1. Buscar si hay bicicletas asociadas a este proveedor
+        List<Bicicleta> bicicletasAsociadas = bicicletaRepository.findByProveedor(proveedor);
+
+        // 2. Si hay bicicletas, primero eliminamos las bicicletas (y su historial)
+        if (!bicicletasAsociadas.isEmpty()) {
+            for (Bicicleta bici : bicicletasAsociadas) {
+                // Reutilizamos el método que ya limpia inventario, ventas y movimientos
+                bicicletaService.eliminarBicicleta(bici.getIdBicicleta());
+            }
         }
-        proveedorRepository.deleteById(id);
+
+        // 3. Finalmente, borrar el proveedor
+        proveedorRepository.delete(proveedor);
     }
 }
