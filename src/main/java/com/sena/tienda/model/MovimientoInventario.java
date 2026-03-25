@@ -14,12 +14,12 @@ public class MovimientoInventario {
     @Column(name = "id_movimiento")
     private Long idMovimiento;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_bicicleta", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Bicicleta bicicleta;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_proveedor", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Proveedor proveedor;
