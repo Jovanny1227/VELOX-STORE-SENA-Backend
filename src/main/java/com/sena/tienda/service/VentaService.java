@@ -91,6 +91,7 @@ public class VentaService {
         ventaRepository.delete(venta);
     }
 
+    @Transactional(readOnly = true)
     public List<Venta> listarTodasLasVentas() { return ventaRepository.findAll(); }
 
     public Optional<Venta> buscarVentaPorId(Long idVenta) { return ventaRepository.findById(idVenta); }
