@@ -1,59 +1,59 @@
 package com.sena.tienda.controller;
 
+import com.sena.tienda.dto.request.VentaRequest;
+import com.sena.tienda.dto.response.BicicletaVentaDTO;
+import com.sena.tienda.dto.response.DetalleVentaDTO;
+import com.sena.tienda.dto.response.VentaDTO;
 import com.sena.tienda.model.Venta;
 import com.sena.tienda.service.VentaService;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
-/**
- * CONTROLADOR: VentaController
- * Expone los endpoints REST para registrar y consultar ventas.
- */
 @RestController
 @RequestMapping("/api/ventas")
-@CrossOrigin(origins = "*")
 public class VentaController {
 
-    @Autowired
-    private VentaService ventaService;
+    private final VentaService ventaService;
 
-    // =========================================
-    // REGISTRAR VENTA
-    // =========================================
+    public VentaController(VentaService ventaService) {
+        this.ventaService = ventaService;
+    }
+
     @PostMapping("/registrar")
-    public Venta registrarVenta(
-            @RequestParam Long clienteId,
-            @RequestParam String codigoBicicleta,
-            @RequestParam int cantidad) {
+    public VentaDTO registrarVenta(@RequestBody VentaRequest request) {
+        Venta v;
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            v = ventaService.registrarVentaMultiple(request.getClienteId(), request.getItems());
+        } else {
+            v = ventaService.registrarVenta(request.getClienteId(), request.getCodigoBicicleta(), request.getCantidad());
+        }
 
-        return ventaService.registrarVenta(clienteId, codigoBicicleta, cantidad);
+        return mapearAVentaDTO(v);
     }
 
-    // =========================================
-    // LISTAR TODAS LAS VENTAS
-    // =========================================
     @GetMapping
-    public List<Venta> listarVentas() {
-        return ventaService.listarTodasLasVentas();
+    public List<VentaDTO> listarVentas() {
+        return ventaService.listarTodasLasVentas().stream()
+                .map(this::mapearAVentaDTO)
+                .toList();
     }
 
-    // =========================================
-    // BUSCAR VENTAS POR CLIENTE
-    // =========================================
-    @GetMapping("/cliente/{clienteId}")
-    public List<Venta> ventasPorCliente(@PathVariable Long clienteId) {
-        return ventaService.buscarVentasPorCliente(clienteId);
+    @DeleteMapping("/{idVenta}")
+    public ResponseEntity<Void> eliminarVenta(@PathVariable Long idVenta) {
+        ventaService.eliminarVenta(idVenta);
+        return ResponseEntity.noContent().build();
     }
 
-    // =========================================
-    // BUSCAR VENTA POR ID
-    // =========================================
-    @GetMapping("/{idVenta}")
-    public Venta buscarVenta(@PathVariable Long idVenta) {
-        return ventaService.buscarVentaPorId(idVenta)
-                .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+    // Método auxiliar para no repetir código y mantener limpio el controlador
+    private VentaDTO mapearAVentaDTO(Venta v) {
+        List<DetalleVentaDTO> detallesDTO = v.getDetalles().stream()
+                .map(d -> new DetalleVentaDTO(
+                        d.getCantidad(),
+                        d.getSubtotal(),
+                        new BicicletaVentaDTO(d.getBicicleta().getMarca(), d.getBicicleta().getModelo())
+                )).toList();
+
+        return new VentaDTO(v.getIdVenta(), v.getCliente().getNombre(), v.getFecha(), v.getTotal(), detallesDTO);
     }
 }

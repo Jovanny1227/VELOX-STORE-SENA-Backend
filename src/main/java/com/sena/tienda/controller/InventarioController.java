@@ -1,11 +1,11 @@
 package com.sena.tienda.controller;
 
-import com.sena.tienda.dto.InventarioDTO;
+import com.sena.tienda.dto.response.InventarioDTO;
 import com.sena.tienda.service.InventarioService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;   // 👈 ESTE IMPORT FALTA
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/inventario")
@@ -19,12 +19,12 @@ public class InventarioController {
     }
 
     @GetMapping("/dashboard")
-    public Map<String, Integer> dashboard(){
+    public Map<String, Integer> dashboard() {
         return inventarioService.dashboardInventario();
     }
 
     @GetMapping
-    public List<InventarioDTO> obtenerInventario(){
+    public List<InventarioDTO> obtenerInventario() {
         return inventarioService.obtenerInventario();
     }
 }

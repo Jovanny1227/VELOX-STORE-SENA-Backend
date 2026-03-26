@@ -2,6 +2,7 @@ package com.sena.tienda.repository;
 
 import com.sena.tienda.model.Bicicleta;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.sena.tienda.model.Proveedor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +14,8 @@ public interface BicicletaRepository extends JpaRepository<Bicicleta, Long> {
     Optional<Bicicleta> findByCodigo(String codigo);
 
     boolean existsByCodigo(String codigo);
+
+    List<Bicicleta> findByProveedor(Proveedor proveedor);
 
     @Query("""
     SELECT b FROM Bicicleta b
