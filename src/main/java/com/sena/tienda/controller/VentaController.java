@@ -1,13 +1,13 @@
 package com.sena.tienda.controller;
 
 import com.sena.tienda.dto.request.VentaRequest;
-import com.sena.tienda.dto.response.BicicletaVentaDTO;
-import com.sena.tienda.dto.response.DetalleVentaDTO;
-import com.sena.tienda.dto.response.VentaDTO;
 import com.sena.tienda.model.Venta;
 import com.sena.tienda.service.VentaService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -20,40 +20,50 @@ public class VentaController {
         this.ventaService = ventaService;
     }
 
+    // Registrar una venta simple
     @PostMapping("/registrar")
-    public VentaDTO registrarVenta(@RequestBody VentaRequest request) {
-        Venta v;
-        if (request.getItems() != null && !request.getItems().isEmpty()) {
-            v = ventaService.registrarVentaMultiple(request.getClienteId(), request.getItems());
-        } else {
-            v = ventaService.registrarVenta(request.getClienteId(), request.getCodigoBicicleta(), request.getCantidad());
-        }
-
-        return mapearAVentaDTO(v);
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> registrarVenta(@RequestBody VentaRequest request) {
+        Venta nuevaVenta = ventaService.registrarVenta(
+                request.getUsuarioId(),
+                request.getCodigoBicicleta(),
+                request.getCantidad()
+        );
+        return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
     }
 
+    // Registrar una venta múltiple (Carrito)
+    @PostMapping("/registrar-multiple")
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> registrarVentaMultiple(@RequestBody VentaRequest request) {
+        Venta nuevaVenta = ventaService.registrarVentaMultiple(
+                request.getUsuarioId(),
+                request.getItems()
+        );
+        return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
+    }
+
+    // Listar todas las ventas (Solo Admin para reportes)
     @GetMapping
-    public List<VentaDTO> listarVentas() {
-        return ventaService.listarTodasLasVentas().stream()
-                .map(this::mapearAVentaDTO)
-                .toList();
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Venta>> listarVentas() {
+        return ResponseEntity.ok(ventaService.listarTodasLasVentas());
     }
 
-    @DeleteMapping("/{idVenta}")
-    public ResponseEntity<Void> eliminarVenta(@PathVariable Long idVenta) {
-        ventaService.eliminarVenta(idVenta);
+    // Buscar una venta por ID
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> buscarVentaPorId(@PathVariable Long id) {
+        return ventaService.buscarVentaPorId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // Eliminar una venta
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> eliminarVenta(@PathVariable Long id) {
+        ventaService.eliminarVenta(id);
         return ResponseEntity.noContent().build();
-    }
-
-    // Método auxiliar para no repetir código y mantener limpio el controlador
-    private VentaDTO mapearAVentaDTO(Venta v) {
-        List<DetalleVentaDTO> detallesDTO = v.getDetalles().stream()
-                .map(d -> new DetalleVentaDTO(
-                        d.getCantidad(),
-                        d.getSubtotal(),
-                        new BicicletaVentaDTO(d.getBicicleta().getMarca(), d.getBicicleta().getModelo())
-                )).toList();
-
-        return new VentaDTO(v.getIdVenta(), v.getCliente().getNombre(), v.getFecha(), v.getTotal(), detallesDTO);
     }
 }

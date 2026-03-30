@@ -14,63 +14,73 @@ import java.util.Optional;
 public class VentaService {
 
     private final VentaRepository ventaRepository;
-    private final ClienteRepository clienteRepository;
+    private final UsuarioRepository usuarioRepository; // Reemplaza ClienteRepository
     private final BicicletaRepository bicicletaRepository;
     private final InventarioRepository inventarioRepository;
     private final MovimientoInventarioService movimientoService;
 
-    public VentaService(VentaRepository ventaRepository, ClienteRepository clienteRepository,
+    public VentaService(VentaRepository ventaRepository, UsuarioRepository usuarioRepository,
                         BicicletaRepository bicicletaRepository, InventarioRepository inventarioRepository,
                         MovimientoInventarioService movimientoService) {
         this.ventaRepository = ventaRepository;
-        this.clienteRepository = clienteRepository;
+        this.usuarioRepository = usuarioRepository;
         this.bicicletaRepository = bicicletaRepository;
         this.inventarioRepository = inventarioRepository;
         this.movimientoService = movimientoService;
     }
 
     @Transactional
-    public Venta registrarVenta(Long clienteId, String codigoBicicleta, int cantidad) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + clienteId));
+    public Venta registrarVenta(Long usuarioId, String codigoBicicleta, int cantidad) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + usuarioId));
         Bicicleta bicicleta = bicicletaRepository.findByCodigo(codigoBicicleta)
                 .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + codigoBicicleta));
+
         if (cantidad <= 0) throw new RuntimeException("La cantidad debe ser mayor a cero");
+
         MovimientoRequest movReq = new MovimientoRequest();
         movReq.setCodigoBicicleta(codigoBicicleta);
         movReq.setCantidad(cantidad);
         movReq.setTipo(TipoMovimiento.SALIDA_VENTA);
-        movReq.setObservacion("Venta a cliente: " + cliente.getNombre());
+        movReq.setObservacion("Venta a usuario: " + usuario.getNombre());
         movimientoService.registrar(movReq);
-        Venta venta = new Venta(cliente);
+
+        Venta venta = new Venta(usuario);
         DetalleVenta detalle = new DetalleVenta(venta, bicicleta, cantidad);
         venta.getDetalles().add(detalle);
         venta.setTotal(detalle.getSubtotal());
+
         return ventaRepository.save(venta);
     }
 
     @Transactional
-    public Venta registrarVentaMultiple(Long clienteId, List<VentaRequest.ItemVentaRequest> items) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + clienteId));
+    public Venta registrarVentaMultiple(Long usuarioId, List<VentaRequest.ItemVentaRequest> items) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + usuarioId));
+
         if (items == null || items.isEmpty())
             throw new RuntimeException("Debe incluir al menos una bicicleta");
-        Venta venta = new Venta(cliente);
+
+        Venta venta = new Venta(usuario);
         BigDecimal totalVenta = BigDecimal.ZERO;
+
         for (VentaRequest.ItemVentaRequest item : items) {
             if (item.getCantidad() <= 0) throw new RuntimeException("Cantidad invalida");
             Bicicleta bicicleta = bicicletaRepository.findByCodigo(item.getCodigoBicicleta())
                     .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + item.getCodigoBicicleta()));
+
             MovimientoRequest movReq = new MovimientoRequest();
             movReq.setCodigoBicicleta(item.getCodigoBicicleta());
             movReq.setCantidad(item.getCantidad());
             movReq.setTipo(TipoMovimiento.SALIDA_VENTA);
-            movReq.setObservacion("Venta multiple a: " + cliente.getNombre());
+            movReq.setObservacion("Venta multiple a: " + usuario.getNombre());
             movimientoService.registrar(movReq);
+
             DetalleVenta detalle = new DetalleVenta(venta, bicicleta, item.getCantidad());
             venta.getDetalles().add(detalle);
             totalVenta = totalVenta.add(detalle.getSubtotal());
         }
+
         venta.setTotal(totalVenta);
         return ventaRepository.save(venta);
     }
