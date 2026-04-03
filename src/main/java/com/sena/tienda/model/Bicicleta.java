@@ -39,6 +39,9 @@ public class Bicicleta {
     @JoinColumn(name = "id_proveedor")
     private Proveedor proveedor;
 
+    @Column(name = "stock")
+    private Integer stock = 0;
+
     public Bicicleta() {}
 
     public Bicicleta(String modelo, String marca, BigDecimal precio, TipoBicicleta tipo, Proveedor proveedor) {
@@ -70,4 +73,7 @@ public class Bicicleta {
 
     public Proveedor getProveedor() { return proveedor; }
     public void setProveedor(Proveedor proveedor) { this.proveedor = proveedor; }
+
+    public Integer getStock() { return stock; }
+    public void setStock(Integer stock) { this.stock = stock; }
 }

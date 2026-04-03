@@ -41,11 +41,17 @@ public class BicicletaService {
         Proveedor proveedor = proveedorRepository.findById(request.proveedorId())
                 .orElseThrow(() -> new RuntimeException("Proveedor no encontrado: " + request.proveedorId()));
 
+        // Creamos la bicicleta
         Bicicleta bicicleta = new Bicicleta(request.modelo(), request.marca(), request.precio(), request.tipo(), proveedor);
+
+        // ¡AQUÍ ESTABA EL ERROR! Debemos pasarle el stock al objeto antes de guardar
+        bicicleta.setStock(stockInicial); // <--- ESTA LÍNEA FALTABA
+
         Bicicleta guardada = bicicletaRepository.save(bicicleta);
         guardada.setCodigo(generarCodigo(guardada.getIdBicicleta()));
         bicicletaRepository.save(guardada);
 
+        // Esto ya lo tenías bien (guarda en la tabla Inventario)
         Inventario inventario = new Inventario();
         inventario.setBicicleta(guardada);
         inventario.setCantidadDisponible(stockInicial);
@@ -65,9 +71,17 @@ public class BicicletaService {
     public List<Bicicleta> registrarMasivo(BicicletaMasivaRequest request) {
         List<Bicicleta> bicicletasGuardadas = new ArrayList<>();
         for (BicicletaMasivaRequest.ItemBicicleta item : request.items()) {
+
+            // ¡AQUÍ ESTABA EL ERROR! Le faltaba el sexto parámetro (el stock) al final
             BicicletaRequest reqIndividual = new BicicletaRequest(
-                    item.modelo(), item.marca(), item.precio(), item.tipo(), item.proveedorId()
+                    item.modelo(),
+                    item.marca(),
+                    item.precio(),
+                    item.tipo(),
+                    item.proveedorId(),
+                    item.cantidad() // <--- ESTO ES LO QUE FALTABA
             );
+
             bicicletasGuardadas.add(registrarBicicleta(reqIndividual, item.cantidad()));
         }
         return bicicletasGuardadas;
@@ -95,6 +109,24 @@ public class BicicletaService {
         bicicletaRepository.delete(bicicleta);
     }
 
+    @Transactional
+    public Bicicleta actualizarBicicleta(Long id, BicicletaRequest request, int nuevoStock) {
+        Bicicleta existente = bicicletaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada"));
+
+        // 🔥 ESTO FALTABA: Buscar el proveedor y actualizarlo 🔥
+        Proveedor proveedor = proveedorRepository.findById(request.proveedorId())
+                .orElseThrow(() -> new RuntimeException("Proveedor no encontrado: " + request.proveedorId()));
+
+        existente.setModelo(request.modelo());
+        existente.setMarca(request.marca());
+        existente.setPrecio(request.precio());
+        existente.setTipo(request.tipo());
+        existente.setStock(nuevoStock);
+        existente.setProveedor(proveedor); // <--- ASIGNAMOS EL PROVEEDOR AQUÍ
+
+        return bicicletaRepository.save(existente);
+    }
     public List<Bicicleta> listarBicicletas() { return bicicletaRepository.findAll(); }
     public Optional<Bicicleta> buscarPorCodigo(String codigo) { return bicicletaRepository.findByCodigo(codigo); }
     public int stockTotal() { return inventarioRepository.stockTotal() != null ? inventarioRepository.stockTotal() : 0; }

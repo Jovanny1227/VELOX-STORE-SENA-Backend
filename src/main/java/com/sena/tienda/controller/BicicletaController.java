@@ -33,7 +33,7 @@ public class BicicletaController {
 
         List<BicicletaDTO> catalogo = bicicletaService.buscarCatalogo(marca, tipo, precioMax).stream()
                 .map(b -> new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(),
-                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "Sin Proveedor"))
+                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "Sin Proveedor", b.getStock()))
                 .toList();
         return ResponseEntity.ok(catalogo);
     }
@@ -53,16 +53,29 @@ public class BicicletaController {
     public List<BicicletaDTO> listar() {
         return bicicletaService.listarBicicletas().stream()
                 .map(b -> new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(),
-                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "N/A"))
+                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "N/A", b.getStock()))
                 .toList();
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
-    public BicicletaDTO registrar(@Valid @RequestBody BicicletaRequest request, @RequestParam(defaultValue = "0") int stock) {
-        var b = bicicletaService.registrarBicicleta(request, stock);
-        return new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(), b.getPrecio(), b.getTipo(), b.getProveedor().getNombre());
+    public BicicletaDTO registrar(@Valid @RequestBody BicicletaRequest request) {
+        int stockInicial = request.stock() != null ? request.stock() : 0;
+        var b = bicicletaService.registrarBicicleta(request, stockInicial);
+        return new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(), b.getPrecio(), b.getTipo(), b.getProveedor().getNombre(), b.getStock());
+    }
+
+    // 🔥 AQUÍ ESTÁ LA SOLUCIÓN: Método PUT para actualizar 🔥
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BicicletaDTO> actualizar(@PathVariable Long id, @Valid @RequestBody BicicletaRequest request) {
+        int nuevoStock = request.stock() != null ? request.stock() : 0;
+
+        var b = bicicletaService.actualizarBicicleta(id, request, nuevoStock);
+
+        BicicletaDTO responseDTO = new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(), b.getPrecio(), b.getTipo(), b.getProveedor().getNombre(), b.getStock());
+        return ResponseEntity.ok(responseDTO);
     }
 
     @DeleteMapping("/{id}")
