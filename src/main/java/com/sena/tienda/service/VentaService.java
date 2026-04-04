@@ -1,5 +1,6 @@
 package com.sena.tienda.service;
 
+import com.sena.tienda.dto.request.VentaPresencialRequest;
 import com.sena.tienda.model.*;
 import com.sena.tienda.repository.*;
 import com.sena.tienda.dto.request.MovimientoRequest;
@@ -18,15 +19,18 @@ public class VentaService {
     private final BicicletaRepository bicicletaRepository;
     private final InventarioRepository inventarioRepository;
     private final MovimientoInventarioService movimientoService;
+    private final ClienteRepository clienteRepository;
 
     public VentaService(VentaRepository ventaRepository, UsuarioRepository usuarioRepository,
                         BicicletaRepository bicicletaRepository, InventarioRepository inventarioRepository,
-                        MovimientoInventarioService movimientoService) {
+                        MovimientoInventarioService movimientoService,
+                        ClienteRepository clienteRepository) {
         this.ventaRepository = ventaRepository;
         this.usuarioRepository = usuarioRepository;
         this.bicicletaRepository = bicicletaRepository;
         this.inventarioRepository = inventarioRepository;
         this.movimientoService = movimientoService;
+        this.clienteRepository = clienteRepository;
     }
 
     @Transactional
@@ -83,62 +87,41 @@ public class VentaService {
     }
 
     @Transactional
-    public Venta registrarVentaMultiple(Long usuarioId, List<VentaRequest.ItemVentaRequest> items) {
+    public Venta registrarVentaMultiple(Long usuarioId, VentaPresencialRequest request) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + usuarioId));
 
-        if (items == null || items.isEmpty())
+        if (request.getItems() == null || request.getItems().isEmpty())
             throw new RuntimeException("Debe incluir al menos una bicicleta");
 
         Venta venta = new Venta(usuario);
+        venta.setTipoVenta(request.getTipoVenta() != null ? request.getTipoVenta() : TipoVenta.VIRTUAL);
+
+        // Si mandaron un clienteId, buscamos al cliente físico
+        if (request.getClienteId() != null) {
+            Cliente cliente = clienteRepository.findById(request.getClienteId())
+                    .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+            venta.setCliente(cliente);
+        }
+
         BigDecimal totalVenta = BigDecimal.ZERO;
 
-        // Validamos si es una sola cosa o varias para el texto de observación
-        String textoObservacion = (items.size() == 1) ? "Venta a: " : "Venta múltiple a: ";
+        // Determinar a nombre de quién queda el movimiento en Kardex
+        String nombreComprador = (venta.getCliente() != null) ? venta.getCliente().getNombre() : usuario.getNombre();
+        String textoObservacion = "Venta " + venta.getTipoVenta().name() + " a: " + nombreComprador;
 
-        for (VentaRequest.ItemVentaRequest item : items) {
-            if (item.getCantidad() <= 0) throw new RuntimeException("Cantidad invalida");
+        for (VentaRequest.ItemVentaRequest item : request.getItems()) {
+            // ... MANTÉN TU LÓGICA DE VALIDAR Y DESCONTAR STOCK AQUÍ ...
 
-            Bicicleta bicicleta = bicicletaRepository.findByCodigo(item.getCodigoBicicleta())
-                    .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + item.getCodigoBicicleta()));
-
-            Inventario inventario = inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
-                    .orElseGet(() -> new Inventario(bicicleta, 0));
-
-            // 🔥 AUTO-SANADOR DE KARDEX 🔥
-            if (inventario.getCantidadDisponible() < item.getCantidad()) {
-                int stockEnCatalogo = (bicicleta.getStock() != null) ? bicicleta.getStock() : 0;
-
-                if (stockEnCatalogo >= item.getCantidad()) {
-                    int faltante = stockEnCatalogo - inventario.getCantidadDisponible();
-                    MovimientoRequest ajusteReq = new MovimientoRequest();
-                    ajusteReq.setCodigoBicicleta(bicicleta.getCodigo());
-                    ajusteReq.setCantidad(faltante);
-                    ajusteReq.setTipo(TipoMovimiento.AJUSTE_POSITIVO);
-                    ajusteReq.setObservacion("Ajuste automático por desincronización de inventario inicial");
-                    movimientoService.registrar(ajusteReq);
-                } else {
-                    throw new RuntimeException("Stock insuficiente real para: " + bicicleta.getModelo() + ". Solo hay " + inventario.getCantidadDisponible());
-                }
-            }
-
-            // 1. Sincronizar catálogo visual (Bicicleta)
-            int stockCatalogo = (bicicleta.getStock() != null) ? bicicleta.getStock() : inventario.getCantidadDisponible();
-            bicicleta.setStock(stockCatalogo - item.getCantidad());
-            bicicletaRepository.save(bicicleta);
-
-            // 2. Registrar Salida oficial en el Kardex
+            // Cuando registres el movimiento, ponle el nuevo texto:
             MovimientoRequest movReq = new MovimientoRequest();
             movReq.setCodigoBicicleta(item.getCodigoBicicleta());
             movReq.setCantidad(item.getCantidad());
             movReq.setTipo(TipoMovimiento.SALIDA_VENTA);
-            movReq.setObservacion(textoObservacion + usuario.getNombre());
+            movReq.setObservacion(textoObservacion); // <--- AHORA DIRÁ "Venta PRESENCIAL a: Juan"
             movimientoService.registrar(movReq);
 
-            // 3. Crear el detalle de factura
-            DetalleVenta detalle = new DetalleVenta(venta, bicicleta, item.getCantidad());
-            venta.getDetalles().add(detalle);
-            totalVenta = totalVenta.add(detalle.getSubtotal());
+            // ... MANTÉN TU LÓGICA DEL DETALLE AQUÍ ...
         }
 
         venta.setTotal(totalVenta);

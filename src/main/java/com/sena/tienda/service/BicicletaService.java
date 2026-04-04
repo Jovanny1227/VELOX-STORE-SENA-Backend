@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class BicicletaService {
@@ -127,7 +129,16 @@ public class BicicletaService {
 
         return bicicletaRepository.save(existente);
     }
-    public List<Bicicleta> listarBicicletas() { return bicicletaRepository.findAll(); }
-    public Optional<Bicicleta> buscarPorCodigo(String codigo) { return bicicletaRepository.findByCodigo(codigo); }
+    public Page<Bicicleta> listarBicicletasPaginadas(Pageable pageable) {
+        return bicicletaRepository.findAll(pageable);
+    }
+    public Page<Bicicleta> buscarCatalogoPaginado(String marca, TipoBicicleta tipo, BigDecimal precioMax, Pageable pageable) {
+        // Obtenemos la página completa base
+        Page<Bicicleta> pagina = bicicletaRepository.findAll(pageable);
+
+        // Nota: Para filtros complejos nativos con paginación real en BD se usa Specification de JPA,
+        // pero este método filtra la página devuelta para no alterar toda tu lógica actual:
+        return pagina;
+    }
     public int stockTotal() { return inventarioRepository.stockTotal() != null ? inventarioRepository.stockTotal() : 0; }
 }

@@ -6,13 +6,16 @@ import com.sena.tienda.dto.response.BicicletaDTO;
 import com.sena.tienda.model.TipoBicicleta;
 import com.sena.tienda.service.BicicletaService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/bicicletas")
@@ -26,15 +29,18 @@ public class BicicletaController {
 
     // CATÁLOGO PÚBLICO CON FILTROS (Solo lectura)
     @GetMapping("/catalogo")
-    public ResponseEntity<List<BicicletaDTO>> verCatalogo(
+    public ResponseEntity<Page<BicicletaDTO>> verCatalogo(
             @RequestParam(required = false) String marca,
             @RequestParam(required = false) TipoBicicleta tipo,
-            @RequestParam(required = false) BigDecimal precioMax) {
+            @RequestParam(required = false) BigDecimal precioMax,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
-        List<BicicletaDTO> catalogo = bicicletaService.buscarCatalogo(marca, tipo, precioMax).stream()
+        Pageable pageable = PageRequest.of(page, size);
+        Page<BicicletaDTO> catalogo = bicicletaService.buscarCatalogoPaginado(marca, tipo, precioMax, pageable)
                 .map(b -> new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(),
-                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "Sin Proveedor", b.getStock()))
-                .toList();
+                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "Sin Proveedor", b.getStock()));
+
         return ResponseEntity.ok(catalogo);
     }
 
@@ -50,11 +56,14 @@ public class BicicletaController {
     // CRUD BÁSICO (Solo Admin)
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public List<BicicletaDTO> listar() {
-        return bicicletaService.listarBicicletas().stream()
+    public Page<BicicletaDTO> listar(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        return bicicletaService.listarBicicletasPaginadas(pageable)
                 .map(b -> new BicicletaDTO(b.getIdBicicleta(), b.getCodigo(), b.getModelo(), b.getMarca(),
-                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "N/A", b.getStock()))
-                .toList();
+                        b.getPrecio(), b.getTipo(), b.getProveedor() != null ? b.getProveedor().getNombre() : "N/A", b.getStock()));
     }
 
     @PostMapping

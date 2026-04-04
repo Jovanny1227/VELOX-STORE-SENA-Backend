@@ -1,5 +1,6 @@
 package com.sena.tienda.controller;
 
+import com.sena.tienda.dto.request.VentaPresencialRequest;
 import com.sena.tienda.dto.request.VentaRequest;
 import com.sena.tienda.model.Venta;
 import com.sena.tienda.service.VentaService;
@@ -20,7 +21,6 @@ public class VentaController {
         this.ventaService = ventaService;
     }
 
-    // Registrar una venta simple
     @PostMapping("/registrar")
     @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
     public ResponseEntity<Venta> registrarVenta(@RequestBody VentaRequest request) {
@@ -32,25 +32,23 @@ public class VentaController {
         return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
     }
 
-    // Registrar una venta múltiple (Carrito)
+    // 🔥 CORRECCIÓN AQUÍ: Cambiamos a VentaPresencialRequest
     @PostMapping("/registrar-multiple")
     @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
-    public ResponseEntity<Venta> registrarVentaMultiple(@RequestBody VentaRequest request) {
+    public ResponseEntity<Venta> registrarVentaMultiple(@RequestBody VentaPresencialRequest request) {
         Venta nuevaVenta = ventaService.registrarVentaMultiple(
-                request.getUsuarioId(),
-                request.getItems()
+                request.getUsuarioId(), // Tomamos el ID del cajero
+                request                 // Le pasamos todo el objeto al servicio
         );
         return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
     }
 
-    // Listar todas las ventas (Solo Admin para reportes)
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Venta>> listarVentas() {
         return ResponseEntity.ok(ventaService.listarTodasLasVentas());
     }
 
-    // Buscar una venta por ID
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
     public ResponseEntity<Venta> buscarVentaPorId(@PathVariable Long id) {
@@ -59,7 +57,6 @@ public class VentaController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Eliminar una venta
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> eliminarVenta(@PathVariable Long id) {
