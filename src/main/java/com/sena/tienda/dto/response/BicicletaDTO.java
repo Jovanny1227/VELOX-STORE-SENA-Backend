@@ -10,5 +10,6 @@ public record BicicletaDTO(
         String marca,
         BigDecimal precio,
         TipoBicicleta tipo,
-        String nombreProveedor
+        String nombreProveedor,
+        Integer stock
 ) {}

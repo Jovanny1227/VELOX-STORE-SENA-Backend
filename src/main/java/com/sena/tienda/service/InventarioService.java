@@ -1,11 +1,12 @@
 package com.sena.tienda.service;
 
-import com.sena.tienda.dto.response.InventarioDTO;
+import com.sena.tienda.model.Inventario;
 import com.sena.tienda.repository.InventarioRepository;
 import org.springframework.stereotype.Service;
-import java.util.Map;
-import java.util.HashMap;
+
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class InventarioService {
@@ -16,18 +17,21 @@ public class InventarioService {
         this.inventarioRepository = inventarioRepository;
     }
 
-    public List<InventarioDTO> obtenerInventario() {
-        return inventarioRepository.obtenerInventarioCompleto();
+    public List<Inventario> listarInventario() {
+        return inventarioRepository.findAll();
     }
 
-    public Map<String, Integer> dashboardInventario() {
-        Map<String, Integer> dashboard = new HashMap<>();
-        dashboard.put("stockTotal", inventarioRepository.stockTotal());
+    // ESTRUCTURA JERÁRQUICA: Tipo -> Marca -> Cantidad Disponible
+    public Map<String, Map<String, Integer>> obtenerInventarioJerarquico() {
+        List<Inventario> inventarios = inventarioRepository.findAll();
 
-        for (Object[] r : inventarioRepository.stockPorTipo()) {
-            dashboard.put(r[0].toString(), ((Number) r[1]).intValue());
-        }
-
-        return dashboard;
+        return inventarios.stream()
+                .collect(Collectors.groupingBy(
+                        inv -> inv.getBicicleta().getTipo().name(),
+                        Collectors.groupingBy(
+                                inv -> inv.getBicicleta().getMarca(),
+                                Collectors.summingInt(Inventario::getCantidadDisponible)
+                        )
+                ));
     }
 }

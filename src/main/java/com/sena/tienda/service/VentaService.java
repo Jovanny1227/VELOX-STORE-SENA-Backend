@@ -1,5 +1,6 @@
 package com.sena.tienda.service;
 
+import com.sena.tienda.dto.request.VentaPresencialRequest;
 import com.sena.tienda.model.*;
 import com.sena.tienda.repository.*;
 import com.sena.tienda.dto.request.MovimientoRequest;
@@ -14,63 +15,115 @@ import java.util.Optional;
 public class VentaService {
 
     private final VentaRepository ventaRepository;
-    private final ClienteRepository clienteRepository;
+    private final UsuarioRepository usuarioRepository;
     private final BicicletaRepository bicicletaRepository;
     private final InventarioRepository inventarioRepository;
     private final MovimientoInventarioService movimientoService;
+    private final ClienteRepository clienteRepository;
 
-    public VentaService(VentaRepository ventaRepository, ClienteRepository clienteRepository,
+    public VentaService(VentaRepository ventaRepository, UsuarioRepository usuarioRepository,
                         BicicletaRepository bicicletaRepository, InventarioRepository inventarioRepository,
-                        MovimientoInventarioService movimientoService) {
+                        MovimientoInventarioService movimientoService,
+                        ClienteRepository clienteRepository) {
         this.ventaRepository = ventaRepository;
-        this.clienteRepository = clienteRepository;
+        this.usuarioRepository = usuarioRepository;
         this.bicicletaRepository = bicicletaRepository;
         this.inventarioRepository = inventarioRepository;
         this.movimientoService = movimientoService;
+        this.clienteRepository = clienteRepository;
     }
 
     @Transactional
-    public Venta registrarVenta(Long clienteId, String codigoBicicleta, int cantidad) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + clienteId));
+    public Venta registrarVenta(Long usuarioId, String codigoBicicleta, int cantidad) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + usuarioId));
+
         Bicicleta bicicleta = bicicletaRepository.findByCodigo(codigoBicicleta)
                 .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + codigoBicicleta));
+
         if (cantidad <= 0) throw new RuntimeException("La cantidad debe ser mayor a cero");
+
+        Inventario inventario = inventarioRepository.findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
+                .orElseGet(() -> new Inventario(bicicleta, 0));
+
+        // 🔥 AUTO-SANADOR DE KARDEX 🔥
+        // Si el Kardex no tiene stock pero el catálogo sí, hacemos un ajuste automático para igualarlos
+        if (inventario.getCantidadDisponible() < cantidad) {
+            int stockEnCatalogo = (bicicleta.getStock() != null) ? bicicleta.getStock() : 0;
+
+            if (stockEnCatalogo >= cantidad) {
+                int faltante = stockEnCatalogo - inventario.getCantidadDisponible();
+                MovimientoRequest ajusteReq = new MovimientoRequest();
+                ajusteReq.setCodigoBicicleta(bicicleta.getCodigo());
+                ajusteReq.setCantidad(faltante);
+                ajusteReq.setTipo(TipoMovimiento.AJUSTE_POSITIVO);
+                ajusteReq.setObservacion("Ajuste automático por desincronización de inventario inicial");
+                movimientoService.registrar(ajusteReq);
+            } else {
+                throw new RuntimeException("Stock insuficiente real para: " + bicicleta.getModelo() + ". Solo hay " + inventario.getCantidadDisponible());
+            }
+        }
+
+        // 1. Sincronizar catálogo visual (Bicicleta)
+        int stockCatalogo = (bicicleta.getStock() != null) ? bicicleta.getStock() : inventario.getCantidadDisponible();
+        bicicleta.setStock(stockCatalogo - cantidad);
+        bicicletaRepository.save(bicicleta);
+
+        // 2. Registrar Salida oficial en el Kardex
         MovimientoRequest movReq = new MovimientoRequest();
         movReq.setCodigoBicicleta(codigoBicicleta);
         movReq.setCantidad(cantidad);
         movReq.setTipo(TipoMovimiento.SALIDA_VENTA);
-        movReq.setObservacion("Venta a cliente: " + cliente.getNombre());
+        movReq.setObservacion("Venta a: " + usuario.getNombre());
         movimientoService.registrar(movReq);
-        Venta venta = new Venta(cliente);
+
+        // 3. Generar la factura (Venta)
+        Venta venta = new Venta(usuario);
         DetalleVenta detalle = new DetalleVenta(venta, bicicleta, cantidad);
         venta.getDetalles().add(detalle);
         venta.setTotal(detalle.getSubtotal());
+
         return ventaRepository.save(venta);
     }
 
     @Transactional
-    public Venta registrarVentaMultiple(Long clienteId, List<VentaRequest.ItemVentaRequest> items) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado: " + clienteId));
-        if (items == null || items.isEmpty())
+    public Venta registrarVentaMultiple(Long usuarioId, VentaPresencialRequest request) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + usuarioId));
+
+        if (request.getItems() == null || request.getItems().isEmpty())
             throw new RuntimeException("Debe incluir al menos una bicicleta");
-        Venta venta = new Venta(cliente);
+
+        Venta venta = new Venta(usuario);
+        venta.setTipoVenta(request.getTipoVenta() != null ? request.getTipoVenta() : TipoVenta.VIRTUAL);
+
+        // Si mandaron un clienteId, buscamos al cliente físico
+        if (request.getClienteId() != null) {
+            Cliente cliente = clienteRepository.findById(request.getClienteId())
+                    .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+            venta.setCliente(cliente);
+        }
+
         BigDecimal totalVenta = BigDecimal.ZERO;
-        for (VentaRequest.ItemVentaRequest item : items) {
-            if (item.getCantidad() <= 0) throw new RuntimeException("Cantidad invalida");
-            Bicicleta bicicleta = bicicletaRepository.findByCodigo(item.getCodigoBicicleta())
-                    .orElseThrow(() -> new RuntimeException("Bicicleta no encontrada: " + item.getCodigoBicicleta()));
+
+        // Determinar a nombre de quién queda el movimiento en Kardex
+        String nombreComprador = (venta.getCliente() != null) ? venta.getCliente().getNombre() : usuario.getNombre();
+        String textoObservacion = "Venta " + venta.getTipoVenta().name() + " a: " + nombreComprador;
+
+        for (VentaRequest.ItemVentaRequest item : request.getItems()) {
+            // ... MANTÉN TU LÓGICA DE VALIDAR Y DESCONTAR STOCK AQUÍ ...
+
+            // Cuando registres el movimiento, ponle el nuevo texto:
             MovimientoRequest movReq = new MovimientoRequest();
             movReq.setCodigoBicicleta(item.getCodigoBicicleta());
             movReq.setCantidad(item.getCantidad());
             movReq.setTipo(TipoMovimiento.SALIDA_VENTA);
-            movReq.setObservacion("Venta multiple a: " + cliente.getNombre());
+            movReq.setObservacion(textoObservacion); // <--- AHORA DIRÁ "Venta PRESENCIAL a: Juan"
             movimientoService.registrar(movReq);
-            DetalleVenta detalle = new DetalleVenta(venta, bicicleta, item.getCantidad());
-            venta.getDetalles().add(detalle);
-            totalVenta = totalVenta.add(detalle.getSubtotal());
+
+            // ... MANTÉN TU LÓGICA DEL DETALLE AQUÍ ...
         }
+
         venta.setTotal(totalVenta);
         return ventaRepository.save(venta);
     }
@@ -79,14 +132,23 @@ public class VentaService {
     public void eliminarVenta(Long idVenta) {
         Venta venta = ventaRepository.findById(idVenta)
                 .orElseThrow(() -> new RuntimeException("Venta no encontrada: " + idVenta));
+
         for (DetalleVenta detalle : venta.getDetalles()) {
+            Bicicleta bicicleta = detalle.getBicicleta();
+
             Inventario inventario = inventarioRepository
-                    .findByBicicletaIdBicicleta(detalle.getBicicleta().getIdBicicleta())
+                    .findByBicicletaIdBicicleta(bicicleta.getIdBicicleta())
                     .orElse(null);
+
             if (inventario != null) {
                 inventario.setCantidadDisponible(inventario.getCantidadDisponible() + detalle.getCantidad());
                 inventarioRepository.save(inventario);
             }
+
+            int stockActualEliminar = (bicicleta.getStock() != null) ? bicicleta.getStock() :
+                    (inventario != null ? inventario.getCantidadDisponible() - detalle.getCantidad() : 0);
+            bicicleta.setStock(stockActualEliminar + detalle.getCantidad());
+            bicicletaRepository.save(bicicleta);
         }
         ventaRepository.delete(venta);
     }

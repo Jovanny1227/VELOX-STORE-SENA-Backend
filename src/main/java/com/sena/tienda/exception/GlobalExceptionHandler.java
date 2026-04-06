@@ -5,51 +5,42 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. Errores de negocio (RuntimeException e IllegalArgumentException)
-    // Atrapa los "throw new RuntimeException(...)" de tus servicios
     @ExceptionHandler({RuntimeException.class, IllegalArgumentException.class})
     public ResponseEntity<ApiError> handleBusinessExceptions(Exception ex) {
         ApiError error = new ApiError(
                 HttpStatus.BAD_REQUEST.value(),
                 ex.getMessage()
         );
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(error);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    // 2. Errores de validación (@Valid en DTOs o Entidades)
+    // 🔥 MEJORA: Ahora devuelve TODOS los errores separados por coma, no solo el primero
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidationErrors(MethodArgumentNotValidException ex) {
         String mensaje = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .findFirst()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .orElse("Datos inválidos");
+                .collect(Collectors.joining(", "));
 
         ApiError apiError = new ApiError(
                 HttpStatus.BAD_REQUEST.value(),
-                mensaje
+                "Datos inválidos: " + mensaje
         );
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(apiError);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
     }
 
-    // 3. Fallback (errores no controlados, base de datos caída, etc.)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
         ApiError error = new ApiError(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Error interno del servidor: " + ex.getMessage() // Opcional: concatenar el mensaje para debug
+                "Error interno del servidor: " + ex.getMessage()
         );
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }

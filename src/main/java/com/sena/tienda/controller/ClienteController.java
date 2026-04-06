@@ -3,59 +3,46 @@ package com.sena.tienda.controller;
 import com.sena.tienda.model.Cliente;
 import com.sena.tienda.service.ClienteService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/clientes")
-@CrossOrigin(origins = "*")
 public class ClienteController {
 
-    @Autowired
-    private ClienteService clienteService;
+    private final ClienteService clienteService;
 
-    @GetMapping
-    public ResponseEntity<List<Cliente>> listar() {
-        return ResponseEntity.ok(clienteService.listarClientes());
+    public ClienteController(ClienteService clienteService) {
+        this.clienteService = clienteService;
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<?> buscarPorId(@PathVariable Long id) {
-        Optional<Cliente> cliente = clienteService.buscarPorId(id);
-        if (cliente.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Cliente no encontrado");
-        return ResponseEntity.ok(cliente.get());
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<Cliente> listar() {
+        return clienteService.listarClientes();
     }
 
     @PostMapping
-    public ResponseEntity<?> registrar(@Valid @RequestBody Cliente cliente) {
-        try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(clienteService.registrarCliente(cliente));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Cliente registrar(@Valid @RequestBody Cliente cliente) {
+        // Tu GlobalExceptionHandler atrapará automáticamente cualquier RuntimeException
+        return clienteService.registrarCliente(cliente);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizar(@PathVariable Long id, @Valid @RequestBody Cliente cliente) {
-        try {
-            return ResponseEntity.ok(clienteService.actualizarCliente(id, cliente));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    public Cliente actualizar(@PathVariable Long id, @Valid @RequestBody Cliente cliente) {
+        return clienteService.actualizarCliente(id, cliente);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminar(@PathVariable Long id) {
-        try {
-            clienteService.eliminarCliente(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@PathVariable Long id) {
+        clienteService.eliminarCliente(id);
     }
 }

@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 
 @Entity
 @Table(name = "venta")
@@ -16,10 +18,11 @@ public class Venta {
     @Column(name = "id_venta")
     private Long idVenta;
 
+    // Se cambia Cliente por Usuario
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id", nullable = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Cliente cliente;
+    private Usuario usuario;
 
     @Column(name = "fecha", nullable = false)
     private LocalDateTime fecha;
@@ -31,22 +34,50 @@ public class Venta {
     @JsonIgnoreProperties({"venta"})
     private List<DetalleVenta> detalles = new ArrayList<>();
 
+    @ManyToOne
+    @JoinColumn(name = "cliente_id", nullable = true)
+    private Cliente cliente;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_venta", nullable = false)
+    private TipoVenta tipoVenta = TipoVenta.VIRTUAL;
+
     public Venta() {}
 
-    public Venta(Cliente cliente) {
-        this.cliente = cliente;
+    // Constructor actualizado
+    public Venta(Usuario usuario) {
+        this.usuario = usuario;
         this.fecha = LocalDateTime.now();
         this.total = BigDecimal.ZERO;
     }
 
     public Long getIdVenta() { return idVenta; }
-    public void setIdVenta(Long v) { this.idVenta = v; }
-    public Cliente getCliente() { return cliente; }
-    public void setCliente(Cliente v) { this.cliente = v; }
+    public void setIdVenta(Long idVenta) { this.idVenta = idVenta; }
+
+    // Getters y Setters actualizados
+    public Usuario getUsuario() { return usuario; }
+    public void setUsuario(Usuario usuario) { this.usuario = usuario; }
+
     public LocalDateTime getFecha() { return fecha; }
-    public void setFecha(LocalDateTime v) { this.fecha = v; }
+    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
     public BigDecimal getTotal() { return total; }
-    public void setTotal(BigDecimal v) { this.total = v; }
+    public void setTotal(BigDecimal total) { this.total = total; }
     public List<DetalleVenta> getDetalles() { return detalles; }
-    public void setDetalles(List<DetalleVenta> v) { this.detalles = v; }
+    public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles; }
+
+    public Cliente getCliente() {
+        return cliente;
+    }
+
+    public void setCliente(Cliente cliente) {
+        this.cliente = cliente;
+    }
+
+    public TipoVenta getTipoVenta() {
+        return tipoVenta;
+    }
+
+    public void setTipoVenta(TipoVenta tipoVenta) {
+        this.tipoVenta = tipoVenta;
+    }
 }

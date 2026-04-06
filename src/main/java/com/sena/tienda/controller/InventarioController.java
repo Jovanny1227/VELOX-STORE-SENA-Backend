@@ -1,15 +1,16 @@
 package com.sena.tienda.controller;
 
-import com.sena.tienda.dto.response.InventarioDTO;
 import com.sena.tienda.service.InventarioService;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/inventario")
-@CrossOrigin(origins = "http://localhost:4200")
 public class InventarioController {
 
     private final InventarioService inventarioService;
@@ -18,13 +19,10 @@ public class InventarioController {
         this.inventarioService = inventarioService;
     }
 
-    @GetMapping("/dashboard")
-    public Map<String, Integer> dashboard() {
-        return inventarioService.dashboardInventario();
-    }
-
-    @GetMapping
-    public List<InventarioDTO> obtenerInventario() {
-        return inventarioService.obtenerInventario();
+    @GetMapping("/jerarquico")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Map<String, Integer>>> obtenerJerarquia() {
+        // Retorna JSON como: { "MTB": { "GW": 5, "Trek": 10 }, "RUTA": { "Sunday": 20 } }
+        return ResponseEntity.ok(inventarioService.obtenerInventarioJerarquico());
     }
 }
