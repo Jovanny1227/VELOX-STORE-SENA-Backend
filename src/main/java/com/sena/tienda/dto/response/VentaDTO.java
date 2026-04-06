@@ -6,7 +6,7 @@ import java.util.List;
 
 public record VentaDTO(
         Long idVenta,
-        String nombreCliente,
+        String nombreUsuario, // Actualizado de nombreCliente a nombreUsuario
         LocalDateTime fecha,
         BigDecimal total,
         List<DetalleVentaDTO> detalles
