@@ -7,6 +7,7 @@ RUN mvn clean package -DskipTests -B
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/tienda-bicicletas-1.0.0.jar app.jar
-EXPOSE 8080
+COPY --from=build /app/target/*.jar app.jar
+ENV PORT=8080
+EXPOSE $PORT
 ENTRYPOINT ["java", "-jar", "app.jar"]
