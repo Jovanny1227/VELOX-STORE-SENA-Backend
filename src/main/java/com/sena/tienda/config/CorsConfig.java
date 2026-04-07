@@ -19,7 +19,7 @@ public class CorsConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOrigins(frontendUrl, "http://localhost:4200",
-                                "https://velox-store-sena-frontend-production-640b.up.railway.app/")
+                                "https://velox-store-sena-frontend-production-640b.up.railway.app")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*");
             }
