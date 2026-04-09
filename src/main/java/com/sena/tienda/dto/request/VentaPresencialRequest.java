@@ -1,24 +1,12 @@
-package com.sena.tienda.dto.request;
+﻿package com.sena.tienda.dto.request;
 
 import com.sena.tienda.model.TipoVenta;
+import lombok.Data;
 import java.util.List;
 
+@Data
 public class VentaPresencialRequest {
-    private Long usuarioId; // 🔥 Faltaba esto
     private List<VentaRequest.ItemVentaRequest> items;
-    private Long clienteId;
     private TipoVenta tipoVenta;
-
-    // Getters y Setters
-    public Long getUsuarioId() { return usuarioId; }
-    public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
-
-    public List<VentaRequest.ItemVentaRequest> getItems() { return items; }
-    public void setItems(List<VentaRequest.ItemVentaRequest> items) { this.items = items; }
-
-    public Long getClienteId() { return clienteId; }
-    public void setClienteId(Long clienteId) { this.clienteId = clienteId; }
-
-    public TipoVenta getTipoVenta() { return tipoVenta; }
-    public void setTipoVenta(TipoVenta tipoVenta) { this.tipoVenta = tipoVenta; }
+    private Long clienteId; // Agregamos explícitamente el ID del cliente
 }
