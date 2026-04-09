@@ -1,4 +1,4 @@
-﻿package com.sena.tienda.dto.request;
+package com.sena.tienda.dto.request;
 
 import com.sena.tienda.model.TipoVenta;
 import lombok.Data;

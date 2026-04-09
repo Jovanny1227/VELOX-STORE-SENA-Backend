@@ -1,4 +1,4 @@
-﻿package com.sena.tienda.controller;
+package com.sena.tienda.controller;
 
 import com.sena.tienda.dto.request.VentaPresencialRequest;
 import com.sena.tienda.model.Venta;
