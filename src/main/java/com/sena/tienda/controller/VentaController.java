@@ -1,34 +1,65 @@
 package com.sena.tienda.controller;
 
 import com.sena.tienda.dto.request.VentaPresencialRequest;
+import com.sena.tienda.dto.request.VentaRequest;
 import com.sena.tienda.model.Venta;
 import com.sena.tienda.service.VentaService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/ventas")
-@RequiredArgsConstructor
-@CrossOrigin(origins = "*")
-@Tag(name = "Ventas", description = "Endpoints para la gestión de ventas")
 public class VentaController {
 
     private final VentaService ventaService;
 
-    @PostMapping("/pos")
-    @Operation(summary = "Registrar venta POS con múltiples productos y cliente")
-    public ResponseEntity<Venta> registrarVentaMultiple(@RequestParam Long usuarioId, @RequestBody VentaPresencialRequest request) {
-        return ResponseEntity.ok(ventaService.registrarVentaMultiple(usuarioId, request));
+    public VentaController(VentaService ventaService) {
+        this.ventaService = ventaService;
     }
-    
+
+    @PostMapping("/registrar")
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> registrarVenta(@RequestBody VentaRequest request) {
+        Venta nuevaVenta = ventaService.registrarVenta(
+                request.getUsuarioId(),
+                request.getCodigoBicicleta(),
+                request.getCantidad()
+        );
+        return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/registrar-multiple")
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> registrarVentaMultiple(@RequestBody VentaPresencialRequest request) {
+        Venta nuevaVenta = ventaService.registrarVentaMultiple(
+                request.getUsuarioId(),
+                request
+        );
+        return new ResponseEntity<>(nuevaVenta, HttpStatus.CREATED);
+    }
+
     @GetMapping
-    @Operation(summary = "Obtener todas las ventas")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Venta>> listarVentas() {
-        return ResponseEntity.ok(ventaService.listarVentas());
+        return ResponseEntity.ok(ventaService.listarTodasLasVentas());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CLIENTE') or hasRole('ADMIN')")
+    public ResponseEntity<Venta> buscarVentaPorId(@PathVariable Long id) {
+        return ventaService.buscarVentaPorId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> eliminarVenta(@PathVariable Long id) {
+        ventaService.eliminarVenta(id);
+        return ResponseEntity.noContent().build();
     }
 }
